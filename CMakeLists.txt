@@ -4,6 +4,4 @@ project(heapManager C)
 set(CMAKE_C_STANDARD 23)
 
 add_executable(heapManager main.c
-        doublylinkedlist.h
-        doublylinkedlist.c
-        instructions.c)
+)
