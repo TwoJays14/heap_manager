@@ -1,0 +1,8 @@
+# ninja log v6
+16	181	7620219867653317	CMakeFiles/heapManager.dir/doublylinkedlist.c.obj	2bb2fe812c176adc
+21	143	7620219867698564	CMakeFiles/heapManager.dir/instructions.c.obj	e3d0330a58aca3fb
+4	631	7620221033476674	CMakeFiles/heapManager.dir/main.c.obj	1696fe4801ef61a1
+632	710	7620221039753566	heapManager.exe	6f54857dbb6f1ecf
+2	202	7621467709064986	build.ninja	fd35820d41d4c5e2
+2	755	7621467709280013	CMakeFiles/heapManager.dir/main.c.obj	1696fe4801ef61a1
+758	846	7621467716841255	heapManager.exe	e22c64ca2309c896
