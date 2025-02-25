@@ -1,3 +1,0 @@
-C:/Users/Jermaine/_programming/C.c/heapManager/cmake-build-debug/CMakeFiles/heapManager.dir
-C:/Users/Jermaine/_programming/C.c/heapManager/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Users/Jermaine/_programming/C.c/heapManager/cmake-build-debug/CMakeFiles/rebuild_cache.dir
