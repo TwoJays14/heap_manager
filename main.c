@@ -3,6 +3,9 @@
 #include <stddef.h>
 
 #define HEAP_SIZE (1024 * 1024)
+#define ALIGNMENT_SIZE 8
+// TODO: refactor to inline function
+#define ALIGN_SIZE(size) (size + (ALIGNMENT_SIZE - 1)) & ~(ALIGNMENT_SIZE - 1)
 
 typedef struct MemoryBlock {
   size_t size;
@@ -35,16 +38,9 @@ int main(void) {
   printf("=== Initial Heap State ===\n");
   print_heap(heap);
 
-  void *int_ptr = mem_alloc(heap, 2000);
-  printf("\n=== After Allocating an int ===\n");
-  print_heap(heap);
-
+  void *int_ptr = mem_alloc(heap, 2001);
   void *double_ptr = mem_alloc(heap, 43320);
-  printf("\n=== After Allocating a double ===\n");
-  print_heap(heap);
-
   void *char_ptr = mem_alloc(heap, 123124);
-  printf("\n=== After Allocating char[50] ===\n");
   print_heap(heap);
 
   mem_free(double_ptr);
@@ -107,41 +103,46 @@ void *find_free_block(MemoryBlock *heap, size_t size) {
   return NULL;
 }
 
-void *mem_alloc(MemoryBlock *heap, size_t size) {
-  MemoryBlock *free_block = find_free_block(heap, size);
-  if (!free_block) {
+void *mem_alloc(MemoryBlock *heap, size_t const size) {
+  size_t const mem_aligned_size = ALIGN_SIZE(size);
+  MemoryBlock *free_block_to_be_allocated = find_free_block(heap, mem_aligned_size);
+  if (!free_block_to_be_allocated) {
     return NULL;
   }
 
-  if (free_block->size >= size + sizeof(MemoryBlock) + 1) {
-    const size_t original_size = free_block->size;
+  MemoryBlock *allocated_block = free_block_to_be_allocated;
+
+  if (free_block_to_be_allocated->size >= mem_aligned_size + sizeof(MemoryBlock) + 1) {
+    const size_t original_size = free_block_to_be_allocated->size;
+
 
     //Mark beginning portion as allocated.
-    free_block->is_allocated = true;
-    free_block->size = size;
+    allocated_block->is_allocated = true;
+    allocated_block->size = mem_aligned_size;
 
 
     // Calculate address of new free block after allocated block
-    const auto new_free_block = (MemoryBlock *) ((char *) free_block + sizeof(MemoryBlock) + size);
-    new_free_block->size = original_size - size - sizeof(MemoryBlock);
+    const auto new_free_block = (MemoryBlock *)((uintptr_t) allocated_block + sizeof(MemoryBlock) + mem_aligned_size);
+    // TODO: validate block splitting conditions
+    new_free_block->size = original_size - mem_aligned_size - sizeof(MemoryBlock);
     new_free_block->is_allocated = false;
 
     // Update linked list
-    new_free_block->prev = free_block;
-    new_free_block->next = free_block->next;
+    new_free_block->prev = allocated_block;
+    new_free_block->next = allocated_block->next;
 
-    if (free_block->next) {
-      free_block->next->prev = new_free_block;
+    if (allocated_block->next) {
+      allocated_block->next->prev = new_free_block;
     }
 
-    free_block->next = new_free_block;
+    allocated_block->next = new_free_block;
 
   } else {
     // No split -> allocate whole block
-    free_block->is_allocated = true;
+    allocated_block->is_allocated = true;
   }
 
-  return (char *) free_block + sizeof(MemoryBlock);
+  return (void *)(uintptr_t) allocated_block + sizeof(MemoryBlock);
 }
 
 void mem_free(void *user_ptr) {
@@ -149,7 +150,8 @@ void mem_free(void *user_ptr) {
     return;
   }
 
-  MemoryBlock *current_block = (MemoryBlock *) ((char *) user_ptr - sizeof(MemoryBlock));
+  // TODO:  verify that the new block’s starting address remains correctly aligned.
+  MemoryBlock *current_block = (MemoryBlock *)((uintptr_t) user_ptr - sizeof(MemoryBlock));
 
   current_block->is_allocated = false;
 
@@ -158,6 +160,7 @@ void mem_free(void *user_ptr) {
 
   if (current_block->prev && !current_block->prev->is_allocated) {
     current_block->prev->size += current_block->size + sizeof(MemoryBlock);
+    current_block->prev->size = ALIGN_SIZE(current_block->prev->size);
 
     current_block->prev->next = current_block->next;
 
@@ -172,6 +175,7 @@ void mem_free(void *user_ptr) {
   // Coalesce with next adjacent block
   if (current_block->next && !current_block->next->is_allocated) {
     current_block->size += current_block->next->size + sizeof(MemoryBlock);
+    current_block->size = ALIGN_SIZE(current_block->size);
 
     if (current_block->next->next) {
       current_block->next = current_block->next->next;
