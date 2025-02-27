@@ -4,7 +4,6 @@
 
 #define HEAP_SIZE (1024 * 1024)
 #define ALIGNMENT_SIZE 8
-// TODO: refactor to inline function
 #define ALIGN_SIZE(size) (size + (ALIGNMENT_SIZE - 1)) & ~(ALIGNMENT_SIZE - 1)
 
 typedef struct MemoryBlock {
@@ -26,6 +25,8 @@ void mem_free(void *user_ptr);
 
 void print_heap(MemoryBlock *heap);
 
+size_t mem_align(size_t size);
+
 
 int main(void) {
   // Initialize a 1 MB heap pool.
@@ -44,15 +45,18 @@ int main(void) {
   print_heap(heap);
 
   mem_free(double_ptr);
-  printf("\n=== After Freeing the double block ===\n");
+  printf("first free: ");
   print_heap(heap);
 
   mem_free(int_ptr);
-  printf("\n=== After Freeing the int block ===\n");
+  printf("second free: ");
+
+  void *ptr = mem_alloc(heap, 123124);
+
   print_heap(heap);
 
   mem_free(char_ptr);
-  printf("\n=== After Freeing the char block (Complete Coalescing) ===\n");
+  printf("third free: ");
   print_heap(heap);
 
   // Release the entire memory pool.
@@ -95,7 +99,7 @@ void *find_free_block(MemoryBlock *heap, size_t size) {
   MemoryBlock *head = heap;
 
   while (head) {
-    if (!head->is_allocated && head->size >= size)
+    if (is_mallocable(head) && head->size >= size)
       return head;
     head = head->next;
   }
@@ -104,7 +108,7 @@ void *find_free_block(MemoryBlock *heap, size_t size) {
 }
 
 void *mem_alloc(MemoryBlock *heap, size_t const size) {
-  size_t const mem_aligned_size = ALIGN_SIZE(size);
+  size_t const mem_aligned_size = mem_align(size);
   MemoryBlock *free_block_to_be_allocated = find_free_block(heap, mem_aligned_size);
   if (!free_block_to_be_allocated) {
     return NULL;
@@ -122,7 +126,7 @@ void *mem_alloc(MemoryBlock *heap, size_t const size) {
 
 
     // Calculate address of new free block after allocated block
-    const auto new_free_block = (MemoryBlock *)((uintptr_t) allocated_block + sizeof(MemoryBlock) + mem_aligned_size);
+    const auto new_free_block = (MemoryBlock *) ((uintptr_t) allocated_block + sizeof(MemoryBlock) + mem_aligned_size);
     // TODO: validate block splitting conditions
     new_free_block->size = original_size - mem_aligned_size - sizeof(MemoryBlock);
     new_free_block->is_allocated = false;
@@ -136,13 +140,12 @@ void *mem_alloc(MemoryBlock *heap, size_t const size) {
     }
 
     allocated_block->next = new_free_block;
-
   } else {
     // No split -> allocate whole block
     allocated_block->is_allocated = true;
   }
 
-  return (void *)(uintptr_t) allocated_block + sizeof(MemoryBlock);
+  return (void *) (uintptr_t) allocated_block + sizeof(MemoryBlock);
 }
 
 void mem_free(void *user_ptr) {
@@ -151,7 +154,7 @@ void mem_free(void *user_ptr) {
   }
 
   // TODO:  verify that the new block’s starting address remains correctly aligned.
-  MemoryBlock *current_block = (MemoryBlock *)((uintptr_t) user_ptr - sizeof(MemoryBlock));
+  MemoryBlock *current_block = (MemoryBlock *) ((uintptr_t) user_ptr - sizeof(MemoryBlock));
 
   current_block->is_allocated = false;
 
@@ -160,7 +163,7 @@ void mem_free(void *user_ptr) {
 
   if (current_block->prev && !current_block->prev->is_allocated) {
     current_block->prev->size += current_block->size + sizeof(MemoryBlock);
-    current_block->prev->size = ALIGN_SIZE(current_block->prev->size);
+    current_block->prev->size = mem_align(current_block->prev->size);
 
     current_block->prev->next = current_block->next;
 
@@ -175,7 +178,7 @@ void mem_free(void *user_ptr) {
   // Coalesce with next adjacent block
   if (current_block->next && !current_block->next->is_allocated) {
     current_block->size += current_block->next->size + sizeof(MemoryBlock);
-    current_block->size = ALIGN_SIZE(current_block->size);
+    current_block->size = mem_align(current_block->size);
 
     if (current_block->next->next) {
       current_block->next = current_block->next->next;
@@ -201,4 +204,8 @@ void print_heap(MemoryBlock *heap) {
     current = current->next;
     index++;
   }
+}
+
+size_t mem_align(size_t size) {
+  return size + (ALIGNMENT_SIZE - 1) & ~(ALIGNMENT_SIZE - 1);
 }
