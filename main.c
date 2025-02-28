@@ -32,6 +32,8 @@ size_t mem_align(size_t size);
 // TODO: implement memory compaction
 void mem_compact(MemoryBlock *heap);
 
+void *mem_realloc(MemoryBlock *heap, size_t new_size);
+
 
 int main(void) {
   // Initialize a 1 MB heap pool.
@@ -114,7 +116,7 @@ void *find_free_block(MemoryBlock *heap, size_t size) {
 void *mem_alloc(MemoryBlock *heap, size_t const size) {
   size_t const mem_aligned_size = mem_align(size);
   MemoryBlock *free_block_to_be_allocated = find_free_block(heap, mem_aligned_size);
-  if (!free_block_to_be_allocated) {
+  if (free_block_to_be_allocated == NULL) {
     return NULL;
   }
 
@@ -191,8 +193,6 @@ void mem_free(void *user_ptr) {
       }
     }
   }
-
-  return;
 }
 
 void print_heap(MemoryBlock *heap) {
@@ -211,4 +211,50 @@ void print_heap(MemoryBlock *heap) {
 
 size_t mem_align(size_t size) {
   return size + (ALIGNMENT_SIZE - 1) & ~(ALIGNMENT_SIZE - 1);
+}
+
+void *mem_realloc(MemoryBlock *heap, size_t new_size) {
+  MemoryBlock *ptr = heap;
+
+  if (ptr == NULL) {
+    mem_alloc(heap, new_size);
+  }
+
+  if (new_size == 0 && ptr != NULL) {
+    mem_free(ptr);
+    return NULL;
+  }
+
+  if (ptr == NULL & new_size == 0) {
+    return NULL;
+  }
+
+  MemoryBlock *current_block_address = (MemoryBlock *)((uintptr_t) ptr - sizeof(MemoryBlock));
+
+  if (!current_block_address->is_allocated) {
+    return NULL;
+  }
+
+  size_t new_block_size = mem_align(current_block_address->size);
+
+  if (new_block_size <= current_block_address->size) {
+    if (current_block_address->size - new_block_size >= sizeof(MemoryBlock) + MIN_BLOCK_SIZE) {
+      MemoryBlock *new_free_block = (MemoryBlock *)((uintptr_t)ptr + new_block_size);
+
+      new_free_block->size = current_block_address->size - new_block_size - sizeof(MemoryBlock) + MIN_BLOCK_SIZE;
+      new_free_block->is_allocated = false;
+      new_free_block->next = current_block_address->next;
+      new_free_block->prev = current_block_address;
+
+      current_block_address->next = new_free_block;
+      current_block_address->size = new_block_size;
+
+
+      return ptr;
+    }
+  } else {
+    current_block_address->size = new_block_size;
+  }
+
+  return NULL;
 }
