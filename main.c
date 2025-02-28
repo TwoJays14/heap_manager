@@ -2,9 +2,11 @@
 #include <windows.h>
 #include <stddef.h>
 
-#define HEAP_SIZE (1024 * 1024)
 #define ALIGNMENT_SIZE 8
+#define MIN_BLOCK_SIZE 4
+#define HEAP_SIZE (1024 * 1024)
 #define ALIGN_SIZE(size) (size + (ALIGNMENT_SIZE - 1)) & ~(ALIGNMENT_SIZE - 1)
+
 
 typedef struct MemoryBlock {
   size_t size;
@@ -26,6 +28,9 @@ void mem_free(void *user_ptr);
 void print_heap(MemoryBlock *heap);
 
 size_t mem_align(size_t size);
+
+// TODO: implement memory compaction
+void mem_compact(MemoryBlock *heap);
 
 
 int main(void) {
@@ -51,7 +56,6 @@ int main(void) {
   mem_free(int_ptr);
   printf("second free: ");
 
-  void *ptr = mem_alloc(heap, 123124);
 
   print_heap(heap);
 
@@ -116,7 +120,7 @@ void *mem_alloc(MemoryBlock *heap, size_t const size) {
 
   MemoryBlock *allocated_block = free_block_to_be_allocated;
 
-  if (free_block_to_be_allocated->size >= mem_aligned_size + sizeof(MemoryBlock) + 1) {
+  if (free_block_to_be_allocated->size >= mem_aligned_size + sizeof(MemoryBlock) + MIN_BLOCK_SIZE) {
     const size_t original_size = free_block_to_be_allocated->size;
 
 
@@ -160,7 +164,6 @@ void mem_free(void *user_ptr) {
 
 
   // Coalesce with previous adjacent block
-
   if (current_block->prev && !current_block->prev->is_allocated) {
     current_block->prev->size += current_block->size + sizeof(MemoryBlock);
     current_block->prev->size = mem_align(current_block->prev->size);
