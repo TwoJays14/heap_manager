@@ -34,6 +34,8 @@ void mem_compact(MemoryBlock *heap);
 
 void *mem_realloc(MemoryBlock *heap, size_t new_size);
 
+void mem_coalesce(MemoryBlock **current_block);
+
 
 int main(void) {
   // Initialize a 1 MB heap pool.
@@ -164,35 +166,8 @@ void mem_free(void *user_ptr) {
 
   current_block->is_allocated = false;
 
-
   // Coalesce with previous adjacent block
-  if (current_block->prev && !current_block->prev->is_allocated) {
-    current_block->prev->size += current_block->size + sizeof(MemoryBlock);
-    current_block->prev->size = mem_align(current_block->prev->size);
-
-    current_block->prev->next = current_block->next;
-
-    if (current_block->next) {
-      current_block->next->prev = current_block->prev;
-    }
-
-    current_block = current_block->prev;
-  }
-
-
-  // Coalesce with next adjacent block
-  if (current_block->next && !current_block->next->is_allocated) {
-    current_block->size += current_block->next->size + sizeof(MemoryBlock);
-    current_block->size = mem_align(current_block->size);
-
-    if (current_block->next->next) {
-      current_block->next = current_block->next->next;
-
-      if (current_block->next->prev) {
-        current_block->next->next->prev = current_block;
-      }
-    }
-  }
+  mem_coalesce(&current_block);
 }
 
 void print_heap(MemoryBlock *heap) {
@@ -225,7 +200,7 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
     return NULL;
   }
 
-  if (ptr == NULL & new_size == 0) {
+  if (ptr == NULL && new_size == 0) {
     return NULL;
   }
 
@@ -237,11 +212,13 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
 
   size_t new_block_size = mem_align(current_block_address->size);
 
+  // if shrinking
+
   if (new_block_size <= current_block_address->size) {
     if (current_block_address->size - new_block_size >= sizeof(MemoryBlock) + MIN_BLOCK_SIZE) {
       MemoryBlock *new_free_block = (MemoryBlock *)((uintptr_t)ptr + new_block_size);
 
-      new_free_block->size = current_block_address->size - new_block_size - sizeof(MemoryBlock) + MIN_BLOCK_SIZE;
+      new_free_block->size = current_block_address->size - new_block_size - sizeof(MemoryBlock);
       new_free_block->is_allocated = false;
       new_free_block->next = current_block_address->next;
       new_free_block->prev = current_block_address;
@@ -249,6 +226,9 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
       current_block_address->next = new_free_block;
       current_block_address->size = new_block_size;
 
+      if(!new_free_block->next->is_allocated) {
+        mem_coalesce(&new_free_block->next);
+      }
 
       return ptr;
     }
@@ -256,5 +236,43 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
     current_block_address->size = new_block_size;
   }
 
+  // if expanding
+
+  if(new_block_size > current_block_address->size) {
+
+  };
+
+
+
   return NULL;
+}
+
+void mem_coalesce(MemoryBlock **current_block) {
+  if ((*current_block)->prev && !(*current_block)->prev->is_allocated) {
+    (*current_block)->prev->size += (*current_block)->size + sizeof(MemoryBlock);
+    (*current_block)->prev->size = mem_align((*current_block)->prev->size);
+
+    (*current_block)->prev->next = (*current_block)->next;
+
+    if ((*current_block)->next) {
+      (*current_block)->next->prev = (*current_block)->prev;
+    }
+
+    *current_block = (*current_block)->prev;
+  }
+
+
+  // Coalesce with next adjacent block
+  if ((*current_block)->next && !(*current_block)->next->is_allocated) {
+    (*current_block)->size += (*current_block)->next->size + sizeof(MemoryBlock);
+    (*current_block)->size = mem_align((*current_block)->size);
+
+    if ((*current_block)->next->next) {
+      (*current_block)->next = (*current_block)->next->next;
+
+      if ((*current_block)->next->prev) {
+        (*current_block)->next->next->prev = *current_block;
+      }
+    }
+  }
 }
