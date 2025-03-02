@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <windows.h>
 #include <stddef.h>
+#include <minwindef.h>
 
 #define ALIGNMENT_SIZE 8
 #define MIN_BLOCK_SIZE 4
@@ -17,7 +18,7 @@ typedef struct MemoryBlock {
 
 void *init_mem_pool();
 
-bool is_mallocable(MemoryBlock *heap);
+bool is_block_allocated(MemoryBlock *heap);
 
 void *find_free_block(MemoryBlock *heap, size_t size);
 
@@ -42,7 +43,7 @@ void split_block_after_expansion(MemoryBlock *block, size_t new_block_size, size
 int main(void) {
   // Initialize a 1 MB heap pool.
   MemoryBlock *heap = init_mem_pool();
-  if (!heap) {
+  if (heap == NULL) {
     fprintf(stderr, "Heap initialization failed.\n");
     return 1;
   }
@@ -80,19 +81,20 @@ int main(void) {
 }
 
 void *init_mem_pool() {
-  constexpr size_t heap_size = 1024 * 1024;
-
-  const LPVOID heap = VirtualAlloc(NULL, heap_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  // request virtual memory
+  const LPVOID heap = VirtualAlloc(NULL, HEAP_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
   MemoryBlock *mem_pool = heap;
 
+  // null pointer error handling
   if (heap == NULL) {
     const DWORD error = GetLastError();
     fprintf(stderr, "Failed to allocate memory. Error Code: %lu", error);
     return NULL;
   }
 
-  mem_pool->size = heap_size - sizeof(MemoryBlock);
+  // initialise mem pool metadata
+  mem_pool->size = HEAP_SIZE - sizeof(MemoryBlock);
   mem_pool->is_allocated = false;
   mem_pool->next = NULL;
   mem_pool->prev = NULL;
@@ -101,7 +103,7 @@ void *init_mem_pool() {
   return mem_pool;
 }
 
-bool is_mallocable(MemoryBlock *heap) {
+bool is_block_allocated(MemoryBlock *heap) {
   return !heap->is_allocated;
 }
 
@@ -109,7 +111,7 @@ void *find_free_block(MemoryBlock *heap, size_t size) {
   MemoryBlock *head = heap;
 
   while (head) {
-    if (is_mallocable(head) && head->size >= size)
+    if (is_block_allocated(head) && head->size >= size)
       return head;
     head = head->next;
   }
@@ -119,7 +121,8 @@ void *find_free_block(MemoryBlock *heap, size_t size) {
 
 void *mem_alloc(MemoryBlock *heap, size_t const size) {
   size_t const mem_aligned_size = mem_align(size);
-  MemoryBlock *free_block_to_be_allocated = find_free_block(heap, mem_aligned_size);
+  MemoryBlock *free_block_to_be_allocated = find_free_block(heap, mem_aligned_size + sizeof(MemoryBlock));
+
   if (free_block_to_be_allocated == NULL) {
     return NULL;
   }
@@ -136,7 +139,8 @@ void *mem_alloc(MemoryBlock *heap, size_t const size) {
 
 
     // Calculate address of new free block after allocated block
-    const MemoryBlock new_free_block = (MemoryBlock *) ((uintptr_t) allocated_block + sizeof(MemoryBlock) + mem_aligned_size);
+    MemoryBlock *new_free_block = (MemoryBlock *) (
+      (char *) allocated_block + sizeof(MemoryBlock) + mem_aligned_size);
     // TODO: validate block splitting conditions
     new_free_block->size = original_size - mem_aligned_size - sizeof(MemoryBlock);
     new_free_block->is_allocated = false;
@@ -155,7 +159,7 @@ void *mem_alloc(MemoryBlock *heap, size_t const size) {
     allocated_block->is_allocated = true;
   }
 
-  return (void *) (uintptr_t) allocated_block + sizeof(MemoryBlock);
+  return (void *) (char *) allocated_block + sizeof(MemoryBlock);
 }
 
 void mem_free(void *user_ptr) {
@@ -164,7 +168,7 @@ void mem_free(void *user_ptr) {
   }
 
   // TODO:  verify that the new block’s starting address remains correctly aligned.
-  MemoryBlock *current_block = (MemoryBlock *) ((uintptr_t) user_ptr - sizeof(MemoryBlock));
+  MemoryBlock *current_block = (MemoryBlock *) ((char *) user_ptr - sizeof(MemoryBlock));
 
   current_block->is_allocated = false;
 
@@ -187,15 +191,12 @@ void print_heap(MemoryBlock *heap) {
 }
 
 size_t mem_align(size_t size) {
-  return size + (ALIGNMENT_SIZE - 1) & ~(ALIGNMENT_SIZE - 1);
+  // rounds size of memory to be allocated to nearest 8 byte boundary
+  return (size + (ALIGNMENT_SIZE - 1)) & ~(ALIGNMENT_SIZE - 1);
 }
 
 void *mem_realloc(MemoryBlock *heap, size_t new_size) {
   MemoryBlock *ptr = heap;
-
-  if (ptr == NULL) {
-    mem_alloc(heap, new_size);
-  }
 
   if (new_size == 0 && ptr != NULL) {
     mem_free(ptr);
@@ -206,7 +207,12 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
     return NULL;
   }
 
-  MemoryBlock *current_block_address = (MemoryBlock *) ((uintptr_t) ptr - sizeof(MemoryBlock));
+  if (ptr == NULL) {
+    ptr = mem_alloc(ptr, new_size);
+    return ptr;
+  }
+
+  MemoryBlock *current_block_address = (MemoryBlock *) ((char *) ptr - sizeof(MemoryBlock));
 
   if (!current_block_address->is_allocated) {
     return NULL;
@@ -218,7 +224,7 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
 
   if (new_block_size <= current_block_address->size) {
     if (current_block_address->size - new_block_size >= sizeof(MemoryBlock) + MIN_BLOCK_SIZE) {
-      MemoryBlock *new_free_block = (MemoryBlock *) ((uintptr_t) ptr + new_block_size);
+      MemoryBlock *new_free_block = (MemoryBlock *) ((char *) ptr + new_block_size);
 
       new_free_block->size = current_block_address->size - new_block_size - sizeof(MemoryBlock);
       new_free_block->is_allocated = false;
@@ -228,8 +234,10 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
       current_block_address->next = new_free_block;
       current_block_address->size = new_block_size;
 
-      if (!new_free_block->next->is_allocated) {
-        mem_coalesce(&new_free_block->next);
+      if (new_free_block->next != NULL) {
+        if (!new_free_block->next->is_allocated) {
+          mem_coalesce(&new_free_block->next);
+        }
       }
 
       return ptr;
@@ -239,9 +247,8 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
   }
 
   // if expanding
-
   if (current_block_address->next != NULL && !current_block_address->next->is_allocated) {
-    if (current_block_address->size + sizeof(MemoryBlock) > new_block_size) {
+    if (current_block_address->size + sizeof(MemoryBlock) + current_block_address->next->size >= new_block_size) {
       size_t available_size = current_block_address->size + sizeof(MemoryBlock) + current_block_address->next->size;
       current_block_address->size = new_block_size;
 
@@ -249,7 +256,7 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
         split_block_after_expansion(current_block_address, new_block_size, available_size);
       }
 
-      if(current_block_address->next->next != NULL) {
+      if (current_block_address->next->next != NULL) {
         current_block_address->next = current_block_address->next->next;
         current_block_address->next->prev = current_block_address;
       } else {
@@ -259,8 +266,13 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
     }
   };
 
+  // if block is already large enough
+  if(current_block_address->size >= new_block_size) {
+    return ptr;
+  };
+
   // Relocate
-  MemoryBlock *new_ptr = mem_alloc(current_block_address, new_block_size);
+  MemoryBlock *new_ptr = mem_alloc(heap, new_block_size);
 
   memcpy(new_ptr, ptr, min(current_block_address->size, new_block_size));
 
@@ -270,7 +282,7 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
 }
 
 void split_block_after_expansion(MemoryBlock *current_block, size_t new_block_size, size_t available_size) {
-  MemoryBlock *new_block = (MemoryBlock *) ((uintptr_t) current_block + sizeof(MemoryBlock) + new_block_size);
+  MemoryBlock *new_block = (MemoryBlock *) ((char *) current_block + sizeof(MemoryBlock) + new_block_size);
 
   // set block metadata
   new_block->size = available_size - (new_block_size + sizeof(MemoryBlock));
@@ -280,12 +292,14 @@ void split_block_after_expansion(MemoryBlock *current_block, size_t new_block_si
 
   current_block->next = new_block;
 
-  if(new_block->next != NULL) {
+  if (new_block->next != NULL) {
     new_block->next->prev = new_block;
   };
 
-  if(new_block->next->is_allocated) {
-    mem_coalesce(&new_block->next);
+  if(new_block->next != NULL) {
+    if (!new_block->next->is_allocated) {
+      mem_coalesce(&new_block->next);
+    };
   };
 };
 
@@ -314,7 +328,7 @@ void mem_coalesce(MemoryBlock **current_block) {
       (*current_block)->next = (*current_block)->next->next;
 
       if ((*current_block)->next->prev) {
-        (*current_block)->next->next->prev = *current_block;
+        (*current_block)->next->prev = *current_block;
       }
     }
   }
