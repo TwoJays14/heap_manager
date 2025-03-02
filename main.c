@@ -129,6 +129,7 @@ void *mem_alloc(MemoryBlock *heap, size_t const size) {
 
   MemoryBlock *allocated_block = free_block_to_be_allocated;
 
+  // check if the free block is large enough to be allocated
   if (free_block_to_be_allocated->size >= mem_aligned_size + sizeof(MemoryBlock) + MIN_BLOCK_SIZE) {
     const size_t original_size = free_block_to_be_allocated->size;
 
