@@ -33,4 +33,8 @@ void split_block_after_expansion(MemoryBlock *block, size_t new_block_size, size
 
 int free_mem_pool(MemoryBlock *heap);
 
+bool is_compaction_ready(MemoryBlock *heap);
+
+bool fragmentation_threshold_reached(MemoryBlock *heap);
+
 #endif //HEAP_MANAGER_H
