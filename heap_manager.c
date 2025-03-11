@@ -9,6 +9,7 @@
 #define MIN_BLOCK_SIZE 4
 #define HEAP_SIZE (1024 * 1024)
 #define ALIGN_SIZE(size) (size + (ALIGNMENT_SIZE - 1)) & ~(ALIGNMENT_SIZE - 1)
+#define NON_CONTIGUOUS_FREE_BLOCK_COUNT 5
 
 
 typedef struct MemoryBlock {
@@ -283,4 +284,37 @@ int free_mem_pool(MemoryBlock *heap) {
   }
 
   return 0;
+}
+
+bool fragmentation_threshold_reached(MemoryBlock *heap) {
+
+  if(heap == NULL) {
+    return NULL;
+  }
+
+  bool mem_usage[] = {};
+  int count = 0;
+
+  MemoryBlock *head = heap;
+
+  while(head->next != NULL) {
+    if(head->is_allocated) {
+      mem_usage[count] = true;
+    } else {
+      mem_usage[count] = false;
+    }
+
+    head = head->next;
+    count++;
+  }
+
+  int non_contiguous_mem_count = 0;
+  bool inside_block = false;
+
+  for(int i = 0; i < sizeof(mem_usage) / sizeof(mem_usage[0]); i++) {
+  }
+
+
+
+  return true;
 }
