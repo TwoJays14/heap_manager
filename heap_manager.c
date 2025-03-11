@@ -292,7 +292,7 @@ bool fragmentation_threshold_reached(MemoryBlock *heap) {
     return NULL;
   }
 
-  bool mem_usage[] = {};
+  bool mem_usage[5] = {};
   int count = 0;
 
   MemoryBlock *head = heap;

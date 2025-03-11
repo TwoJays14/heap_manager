@@ -20,6 +20,8 @@ int main(void) {
   printf("first free: ");
   print_heap(heap);
 
+  fragmentation_threshold_reached(heap);
+
   mem_free(int_ptr);
   printf("second free: ");
 
