@@ -23,7 +23,7 @@ void print_heap(MemoryBlock *heap);
 size_t mem_align(size_t size);
 
 // TODO: implement memory compaction
-void mem_compact(MemoryBlock *heap);
+void *mem_compact(MemoryBlock *heap);
 
 void *mem_realloc(MemoryBlock *heap, size_t new_size);
 

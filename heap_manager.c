@@ -19,7 +19,7 @@ typedef struct MemoryBlock {
   struct MemoryBlock *prev;
 } MemoryBlock;
 
-void *init_mem_pool() {
+void* init_mem_pool() {
   // request virtual memory
   const LPVOID heap = VirtualAlloc(NULL, HEAP_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
@@ -46,7 +46,7 @@ bool is_block_allocated(MemoryBlock *heap) {
   return !heap->is_allocated;
 }
 
-void *find_free_block(MemoryBlock *heap, size_t size) {
+void* find_free_block(MemoryBlock *heap, size_t size) {
   MemoryBlock *head = heap;
 
   while (head) {
@@ -58,7 +58,7 @@ void *find_free_block(MemoryBlock *heap, size_t size) {
   return NULL;
 }
 
-void *mem_alloc(MemoryBlock *heap, size_t const size) {
+void* mem_alloc(MemoryBlock *heap, size_t const size) {
   size_t const mem_aligned_size = mem_align(size);
   MemoryBlock *free_block_to_be_allocated = find_free_block(heap, mem_aligned_size + sizeof(MemoryBlock));
 
@@ -137,7 +137,7 @@ size_t mem_align(size_t size) {
   return (size + (ALIGNMENT_SIZE - 1)) & ~(ALIGNMENT_SIZE - 1);
 }
 
-void *mem_realloc(MemoryBlock *heap, size_t new_size) {
+void* mem_realloc(MemoryBlock *heap, size_t new_size) {
   MemoryBlock *ptr = heap;
 
   if (new_size == 0 && ptr != NULL) {
