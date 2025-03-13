@@ -291,17 +291,12 @@ bool fragmentation_threshold_reached(MemoryBlock *heap) {
     return false;
   }
 
-  int free_block_count = 0;
   int transition_count = 0;
   bool prev_block_is_allocated = heap->is_allocated;
 
   MemoryBlock *current = heap;
 
   while (current != NULL) {
-    if (!current->is_allocated) {
-      free_block_count++;
-    }
-
     if (current != heap && prev_block_is_allocated && !current->is_allocated) {
       transition_count++;
     }
