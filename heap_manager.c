@@ -209,7 +209,7 @@ void *mem_realloc(MemoryBlock *heap, size_t new_size) {
   };
 
   // if block is already large enough
-  if(current_block_address->size >= new_block_size) {
+  if (current_block_address->size >= new_block_size) {
     return ptr;
   };
 
@@ -238,7 +238,7 @@ void split_block_after_expansion(MemoryBlock *current_block, size_t new_block_si
     new_block->next->prev = new_block;
   };
 
-  if(new_block->next != NULL) {
+  if (new_block->next != NULL) {
     if (!new_block->next->is_allocated) {
       mem_coalesce(&new_block->next);
     };
@@ -287,34 +287,34 @@ int free_mem_pool(MemoryBlock *heap) {
 }
 
 bool fragmentation_threshold_reached(MemoryBlock *heap) {
-
-  if(heap == NULL) {
-    return NULL;
+  if (heap == NULL) {
+    return false;
   }
 
-  bool mem_usage[5] = {};
-  int count = 0;
+  int free_block_count = 0;
+  int transition_count = 0;
+  bool prev_block_is_allocated = heap->is_allocated;
 
-  MemoryBlock *head = heap;
+  MemoryBlock *current = heap;
 
-  while(head->next != NULL) {
-    if(head->is_allocated) {
-      mem_usage[count] = true;
-    } else {
-      mem_usage[count] = false;
+  while (current != NULL) {
+    if (!current->is_allocated) {
+      free_block_count++;
     }
 
-    head = head->next;
-    count++;
+    if (current != heap && prev_block_is_allocated && !current->is_allocated) {
+      transition_count++;
+    }
+
+    prev_block_is_allocated = current->is_allocated;
+    current = current->next;
   }
 
-  int non_contiguous_mem_count = 0;
-  bool inside_block = false;
+  int non_contiguous_free_blocks = transition_count;
 
-  for(int i = 0; i < sizeof(mem_usage) / sizeof(mem_usage[0]); i++) {
+  if (non_contiguous_free_blocks >= NON_CONTIGUOUS_FREE_BLOCK_COUNT) {
+    return true;
   }
 
-
-
-  return true;
+  return false;
 }
