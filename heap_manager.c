@@ -326,7 +326,9 @@ void* mem_compact(MemoryBlock *heap) {
 
   // move allocated block so allocated blocks are adjacent
 
-  // set block metadata
+  // set blocks metadata
+
+  // repeat until there is only one transition pair
 
 
   return heap;
