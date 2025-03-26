@@ -313,3 +313,21 @@ bool fragmentation_threshold_reached(MemoryBlock *heap) {
 
   return false;
 }
+
+void* mem_compact(MemoryBlock *heap) {
+
+  // loop through heap
+
+  // find transition pairs - where A=>F then F=>A
+
+  // calculate space between transition pairs i.e. 2 free blocks between allocated blocks
+
+  // do pointer arithmetic to get ptrs to relevant blocks
+
+  // move allocated block so allocated blocks are adjacent
+
+  // set block metadata
+
+
+  return heap;
+}
